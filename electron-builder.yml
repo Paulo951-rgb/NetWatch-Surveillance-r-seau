@@ -1,0 +1,77 @@
+appId: com.netwatch.app
+productName: NetWatch
+copyright: Copyright © 2026 NetWatch
+
+directories:
+  buildResources: build
+  output: release
+
+files:
+  - out/**
+  - package.json
+  - "!**/*.map"
+
+asar: true
+asarUnpack:
+  - node_modules/better-sqlite3/**
+
+extraResources:
+  - from: resources/oui.json
+    to: oui.json
+  - from: resources/icon.png
+    to: icon.png
+  - from: resources/tray.png
+    to: tray.png
+
+# better-sqlite3 13 fournit des binaires N-API par plateforme : pas de recompilation.
+npmRebuild: false
+
+win:
+  icon: build/icon.ico
+  files:
+    - "!node_modules/better-sqlite3/prebuilds/{linux*,darwin*}*"
+
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+  artifactName: NetWatch-${version}-${arch}.${ext}
+  legalTrademarks: NetWatch
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: NetWatch
+  uninstallDisplayName: NetWatch
+  deleteAppDataOnUninstall: false
+  artifactName: NetWatch-${version}-setup.${ext}
+
+portable:
+  artifactName: NetWatch-${version}-portable.${ext}
+
+linux:
+  icon: build/icon.png
+  files:
+    - "!node_modules/better-sqlite3/prebuilds/{win32*,darwin*}*"
+
+  category: Network
+  target:
+    - AppImage
+  artifactName: NetWatch-${version}-${arch}.${ext}
+
+mac:
+  icon: build/icon.png
+  files:
+    - "!node_modules/better-sqlite3/prebuilds/{win32*,linux*}*"
+
+  category: public.app-category.utilities
+  target:
+    - dmg
+  artifactName: NetWatch-${version}-${arch}.${ext}

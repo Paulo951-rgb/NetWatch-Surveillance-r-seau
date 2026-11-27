@@ -1,0 +1,6 @@
+Envoi d'une requete 'ping' sur 8.8.8.8 avec 32 octets de donnees :
+Delai d'attente de la reponse depasse.
+Delai d'attente de la reponse depasse.
+
+Statistiques Ping pour 8.8.8.8:
+    Paquets : envoyes = 2, recus = 0, perdus = 2 (100% perte),

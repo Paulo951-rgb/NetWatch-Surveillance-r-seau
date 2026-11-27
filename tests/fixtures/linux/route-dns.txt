@@ -1,0 +1,4 @@
+---
+search runtime-pods.svc.cluster.local svc.cluster.local cluster.local us-central1-c.c.production-092024.internal c.production-092024.internal google.internal
+nameserver 10.3.0.10
+options ndots:5

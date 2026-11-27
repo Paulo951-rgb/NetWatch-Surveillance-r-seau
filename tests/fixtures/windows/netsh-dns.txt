@@ -1,0 +1,4 @@
+Configuration de l'interface "Ethernet"
+    Serveurs DNS configures statiquement : 192.168.1.1
+                                          8.8.8.8
+    Enregistrer avec le suffixe : Non
