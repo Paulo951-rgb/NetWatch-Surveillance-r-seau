@@ -297,12 +297,16 @@ généré en exécutant le stub 32 bits) ainsi qu'un affichage virtuel. Détail 
 [docs/LANCEMENT.md](docs/LANCEMENT.md#compilation-croisée-depuis-linux). Sous Windows, aucune dépendance
 supplémentaire n'est nécessaire.
 
-Derniers artefacts vérifiés (build du 27/11/2026, Windows x64) :
+Artefacts de référence — construits par le workflow de release sur `windows-latest`, tests passés
+(Windows Server 2025, x64) :
 
 | Fichier | Taille | SHA-256 |
 | --- | --- | --- |
-| `NetWatch-1.0.0-setup.exe` | 129 209 789 octets | `b9c38ac1b549a41fff6821d26a9909f05a484075bd048bb5feeefdf28d3c2398` |
-| `NetWatch-1.0.0-portable.exe` | 117 224 755 octets | `0ba5574ab8b17aa5b616271fea5891ee3ef3499ff541f9eeb64333dc69f33c53` |
+| `NetWatch-1.0.0-setup.exe` | 128 423 582 octets | `c640930f76b7e4425ec0abcf9dd71c8091c7006e7f1ed87c7b251953241e8364` |
+| `NetWatch-1.0.0-portable.exe` | 116 343 370 octets | `259a738b4abb5b60c303515d38bef274dc28267ba2a3aaa7a00fd328c5c637a9` |
+
+Un build local (`npm run dist:win`) produit des fichiers équivalents mais **non reproductibles octet pour
+octet** : les sommes ci-dessus ne valent que pour les fichiers téléchargés depuis la page Releases.
 
 Contrôle de l'installateur : il contient `$PLUGINSDIR/app-64.7z` (charge utile de l'application) et
 `$R0/Uninstall NetWatch.exe` (désinstalleur), ce qui garantit une désinstallation propre enregistrée dans
