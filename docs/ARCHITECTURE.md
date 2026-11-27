@@ -80,6 +80,27 @@ Index sur `devices(mac|ip|status)`, `alerts(created_at|read)`, `events(category,
 Chaque handler retourne une structure sérialisable ; les erreurs sont converties en messages courts et
 journalisées côté processus principal (jamais de pile d'exécution exposée à l'interface).
 
+### Contrôle d'origine
+
+`src/main/security.ts` vérifie chaque appel avant d'exécuter le handler :
+
+1. le cadre émetteur doit être le cadre **principal** (une iframe injectée est refusée) ;
+2. `event.sender.id` doit correspondre à la fenêtre applicative ;
+3. l'URL doit être `file://` (version empaquetée) ou le serveur Vite (développement).
+
+Un refus écrit une ligne `IPC <canal> refusé : <raison>` dans le journal et renvoie une erreur générique.
+
+`hardenSession()` complète la défense en profondeur : toutes les permissions de session sont refusées et
+`webRequest.onBeforeRequest` annule toute requête du renderer vers un hôte non local (seuls `file://`,
+`devtools://`, `blob:`, `data:` et le serveur de développement sont autorisés).
+
+### Validation des entrées
+
+`src/main/validation.ts` fournit `asString`, `asInt`, `asBool`, `asEnum`, `asHost`. Les cibles réseau (scan,
+traceroute) passent par `asHost`, qui n'accepte qu'une IPv4 valide, un CIDR privé de préfixe 16–32 ou un nom
+d'hôte court — jamais une chaîne contenant un séparateur de commande. Les identifiants, limites de pagination,
+formats d'export et catégories sont bornés de la même manière.
+
 ## 5. Adaptateurs plateforme
 
 `services/platform/{windows,linux,darwin}.ts` implémentent la même interface `PlatformAdapter` :
@@ -109,3 +130,19 @@ dispose d'un seuil et d'un délai de repos (`cooldownMinutes`) pour éviter le s
 * Réseau : chaque appel système a un délai maximal ; un échec est journalisé et renvoyé comme indisponible.
 * Mémoire : séries limitées en RAM (historique glissant), données anciennes purgées selon la rétention.
 * Interface : abonnements temps réel nettoyés au démontage des composants, aucun polling redondant.
+
+### Résilience de la base
+
+* Au démarrage, `PRAGMA quick_check` valide le fichier. Si la base est illisible, elle est renommée
+  `netwatch.db.corrupt-<horodatage>` (avec ses fichiers `-wal`/`-shm`) et une base neuve est créée : l'application
+  démarre toujours.
+* `backupDatabase()` utilise l'API de sauvegarde à chaud de SQLite (cohérente en mode WAL).
+* La restauration vérifie l'intégrité de la sauvegarde avant de remplacer le fichier, puis relance l'application.
+* La fermeture (`before-quit`) exécute `context.close()` : arrêt des minuteurs, écriture des agrégats, fermeture
+  de la base.
+
+### Détection d'anomalie de trafic
+
+`AlertEngine.onTraffic` conserve une fenêtre glissante de 120 échantillons (≈ 4 minutes à 2 s). Après 30
+échantillons, un débit supérieur à `moyenne + max(3 σ, 2 × moyenne)` et à 4 Mbit/s déclenche une alerte
+`traffic-anomaly` qui indique la moyenne mesurée et rappelle qu'un pic n'est pas une preuve d'attaque.

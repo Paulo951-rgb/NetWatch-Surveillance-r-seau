@@ -215,6 +215,7 @@ export type AlertType =
   | 'internet-restored'
   | 'high-latency'
   | 'high-traffic'
+  | 'traffic-anomaly'
   | 'local-ip-changed'
   | 'gateway-changed'
   | 'dns-failure'
@@ -318,6 +319,27 @@ export interface DashboardSnapshot {
   monitorEnabled: boolean
 }
 
+export interface DatabaseIntegrity {
+  ok: boolean
+  messages: string[]
+  sizeBytes: number
+  pageCount: number
+  path: string
+  schemaVersion: number
+}
+
+export interface BackupResult {
+  canceled: boolean
+  filePath: string | null
+  bytes: number
+}
+
+export interface RestoreResult {
+  canceled: boolean
+  restored: boolean
+  message: string
+}
+
 export interface HistoryQuery {
   from?: number
   to?: number
@@ -371,6 +393,8 @@ export interface AlertThresholds {
   internetLost: boolean
   highLatency: boolean
   highTraffic: boolean
+  /** Comparaison au comportement habituel (moyenne glissante) plutôt qu'à un seuil fixe. */
+  trafficAnomaly: boolean
   localIpChanged: boolean
   dnsFailure: boolean
   highLatencyMs: number
@@ -416,6 +440,8 @@ export interface Settings {
   privacy: {
     allowPublicIp: boolean
     allowExternalPing: boolean
+    /** Aucune requête sortante hors réseau local (IP publique, ping Internet, tests distants). */
+    strictLocal: boolean
   }
   advanced: {
     activeProfileId: string

@@ -13,6 +13,7 @@ const RULES: { key: keyof Settings['alerts']; label: string }[] = [
   { key: 'internetLost', label: 'alerts.internetLost' },
   { key: 'highLatency', label: 'alerts.highLatency' },
   { key: 'highTraffic', label: 'alerts.highTraffic' },
+  { key: 'trafficAnomaly', label: 'alerts.trafficAnomaly' },
   { key: 'localIpChanged', label: 'alerts.localIpChanged' },
   { key: 'dnsFailure', label: 'alerts.dnsFailure' }
 ]

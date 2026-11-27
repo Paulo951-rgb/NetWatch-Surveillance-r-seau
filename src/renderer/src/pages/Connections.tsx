@@ -108,8 +108,8 @@ export default function Connections(): ReactNode {
               <th>{t('conn.local')}</th>
               <th>{t('conn.remote')}</th>
               <th>{t('conn.state')}</th>
-              <th>{t('conn.direction')}</th>
-              <th>{t('conn.pid')}</th>
+              <th className="col-secondary">{t('conn.direction')}</th>
+              <th className="col-secondary">{t('conn.pid')}</th>
             </tr>
           </thead>
           <tbody>
@@ -140,12 +140,12 @@ export default function Connections(): ReactNode {
                     {connection.remoteAddress === '*' ? '—' : `${connection.remoteAddress}:${connection.remotePort}`}
                   </td>
                   <td className="tiny">{connection.state}</td>
-                  <td>
+                  <td className="col-secondary">
                     <Badge tone={directionTone(connection.direction)}>
                       {t(`conn.${connection.direction === 'local' ? 'localOnly' : connection.direction}` as never)}
                     </Badge>
                   </td>
-                  <td className="mono muted">{connection.pid ?? '—'}</td>
+                  <td className="mono muted col-secondary">{connection.pid ?? '—'}</td>
                 </tr>
               ))
             )}

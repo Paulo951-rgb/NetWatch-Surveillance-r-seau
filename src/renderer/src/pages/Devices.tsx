@@ -145,8 +145,8 @@ export default function Devices(): ReactNode {
               <th>{t('common.name')}</th>
               <th>{t('dash.localIp')}</th>
               <th>{t('dash.mac')}</th>
-              <th>{t('devices.vendor')}</th>
-              <th>{t('common.type')}</th>
+              <th className="col-secondary">{t('devices.vendor')}</th>
+              <th className="col-secondary">{t('common.type')}</th>
               <th>{t('common.status')}</th>
               <th>{t('devices.approve')}</th>
               <th>{t('devices.lastSeen')}</th>
@@ -184,8 +184,8 @@ export default function Devices(): ReactNode {
                   </td>
                   <td className="mono">{device.ip ?? '—'}</td>
                   <td className="mono">{device.mac ?? '—'}</td>
-                  <td className="truncate">{device.vendor ?? '—'}</td>
-                  <td>{deviceTypeText(language, device.deviceType)}</td>
+                  <td className="truncate col-secondary">{device.vendor ?? '—'}</td>
+                  <td className="col-secondary">{deviceTypeText(language, device.deviceType)}</td>
                   <td>
                     <Badge tone={device.status === 'online' ? 'ok' : 'neutral'} dot>
                       {device.status === 'online' ? t('common.online') : t('common.offline')}

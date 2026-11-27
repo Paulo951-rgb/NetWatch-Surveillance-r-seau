@@ -43,6 +43,12 @@ export default function Settings(): ReactNode {
     toast.success(t('set.settingsSaved'))
   }
 
+  const runDbAction = (action: () => Promise<void>): void => {
+    void action().catch((error: unknown) => {
+      toast.error(t('common.error'), error instanceof Error ? error.message : undefined)
+    })
+  }
+
   if (!settings) return null
 
   return (
@@ -223,6 +229,12 @@ export default function Settings(): ReactNode {
                 onChange={(value) => void save({ privacy: { allowPublicIp: value } })}
               />
             </SettingRow>
+            <SettingRow label={t('set.strictLocal')} description={t('set.strictLocalDesc')}>
+              <Switch
+                checked={settings.privacy.strictLocal}
+                onChange={(value) => void save({ privacy: { strictLocal: value } })}
+              />
+            </SettingRow>
             <SettingRow label={t('set.allowExternalPing')} description={t('set.allowExternalPingDesc')}>
               <Switch
                 checked={settings.privacy.allowExternalPing}
@@ -339,6 +351,47 @@ export default function Settings(): ReactNode {
             </div>
           </div>
         ) : null}
+        <div className="row wrap" style={{ gap: 8, marginTop: 14 }}>
+          <button
+            className="btn sm"
+            onClick={() =>
+              runDbAction(async () => {
+                const report = await window.netwatch.checkDatabase()
+                if (report.ok) toast.success(`${t('set.dbOk')} · ${report.pageCount} pages`)
+                else toast.error(`${t('set.dbProblem')} : ${report.messages.join('; ')}`)
+              })
+            }
+          >
+            <IconDatabase size={14} />
+            {t('set.checkDb')}
+          </button>
+          <button
+            className="btn sm"
+            onClick={() =>
+              runDbAction(async () => {
+                const result = await window.netwatch.backupDatabase()
+                if (!result.canceled) toast.success(`${t('set.dbBackupDone')} · ${result.filePath}`)
+              })
+            }
+          >
+            <IconFile size={14} />
+            {t('set.backupDb')}
+          </button>
+          <button
+            className="btn sm danger"
+            onClick={() => {
+              if (!window.confirm(t('set.dbRestoreConfirm'))) return
+              runDbAction(async () => {
+                const result = await window.netwatch.restoreDatabase()
+                if (result.restored) toast.success(result.message)
+              })
+            }}
+          >
+            <IconAlert size={14} />
+            {t('set.restoreDb')}
+          </button>
+          <span className="tiny muted" style={{ alignSelf: 'center' }}>SQLite · WAL · local</span>
+        </div>
       </Card>
 
       <Card>
@@ -467,10 +520,6 @@ export default function Settings(): ReactNode {
             <dt>{t('set.oldestEvent')}</dt>
             <dd>{stats?.oldestEventAt ? new Date(stats.oldestEventAt).toLocaleString() : '—'}</dd>
           </dl>
-          <div className="row" style={{ gap: 8, marginTop: 12 }}>
-            <IconDatabase size={15} />
-            <span className="tiny muted">SQLite · WAL · local</span>
-          </div>
         </Card>
       </div>
 

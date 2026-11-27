@@ -1,10 +1,21 @@
-import { app, BrowserWindow, Menu, nativeImage, Notification, powerMonitor, shell, Tray } from 'electron'
+import {
+  app,
+  BrowserWindow,
+  Menu,
+  nativeImage,
+  Notification,
+  powerMonitor,
+  session,
+  shell,
+  Tray
+} from 'electron'
 import { join } from 'node:path'
 import { existsSync, writeFileSync } from 'node:fs'
 import { LIVE_CHANNELS } from '@shared/ipc'
 import { buildPaths, createAppContext, type AppContext } from './context'
 import { registerIpcHandlers } from './ipc'
 import { Scheduler } from './scheduler'
+import { hardenSession } from './security'
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -62,8 +73,8 @@ function createWindow(): BrowserWindow {
   const window = new BrowserWindow({
     width: 1440,
     height: 900,
-    minWidth: 1080,
-    minHeight: 680,
+    minWidth: 960,
+    minHeight: 600,
     show: false,
     frame: false,
     backgroundColor: '#060a11',
@@ -137,12 +148,22 @@ function setupCapture(window: BrowserWindow): void {
     ? multi.split(',').map((entry) => entry.trim()).filter(Boolean)
     : [process.env.NETWATCH_CAPTURE_ROUTE ?? '']
   const delay = Number(process.env.NETWATCH_CAPTURE_DELAY ?? 4500)
+  const width = Number(process.env.NETWATCH_CAPTURE_WIDTH ?? 0)
+  const height = Number(process.env.NETWATCH_CAPTURE_HEIGHT ?? 0)
+  const scroll = Number(process.env.NETWATCH_CAPTURE_SCROLL ?? 0)
+  if (width > 0 && height > 0) window.setContentSize(width, height)
   setTimeout(() => {
     void (async () => {
       try {
         for (const route of routes) {
           if (route) window.webContents.send(LIVE_CHANNELS.navigate, route)
           await new Promise((resolve) => setTimeout(resolve, route ? 1400 : 0))
+          if (scroll > 0) {
+            await window.webContents.executeJavaScript(
+              `document.querySelector('.content')?.scrollTo({ top: ${scroll}, behavior: 'instant' })`
+            )
+            await new Promise((resolve) => setTimeout(resolve, 400))
+          }
           const image = await window.webContents.capturePage()
           const suffix = route ? `-${route.replace(/\//g, '')}` : ''
           const file = routes.length > 1 ? target.replace(/\.png$/, `${suffix}.png`) : target
@@ -297,6 +318,7 @@ if (!gotLock) {
 
   app.whenReady().then(() => {
     try {
+      hardenSession(session.defaultSession, process.env['ELECTRON_RENDERER_URL'])
       bootstrap()
     } catch (error) {
       context?.logger.error('Démarrage impossible', error)

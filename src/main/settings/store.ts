@@ -31,6 +31,7 @@ export const DEFAULT_SETTINGS: Settings = {
     internetLost: true,
     highLatency: true,
     highTraffic: true,
+    trafficAnomaly: true,
     localIpChanged: true,
     dnsFailure: true,
     highLatencyMs: 120,
@@ -40,7 +41,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   retention: { days: 30, maxAlerts: 1000 },
   startup: { launchAtLogin: false, startMinimized: false, minimizeToTray: true },
-  privacy: { allowPublicIp: false, allowExternalPing: true },
+  privacy: { allowPublicIp: false, allowExternalPing: true, strictLocal: false },
   advanced: { activeProfileId: 'balanced', showExperimental: false },
   export: { defaultFormat: 'csv', includeHeaders: true }
 }
@@ -118,8 +119,8 @@ function clone<T>(value: T): T {
 }
 
 /** Valide et normalise des paramètres quelconques (données de disque comprises). */
-export function sanitizeSettings(raw: unknown): Settings {
-  const base = DEFAULT_SETTINGS
+export function sanitizeSettings(raw: unknown, defaults: Settings = DEFAULT_SETTINGS): Settings {
+  const base = defaults
   if (!isRecord(raw)) return clone(base)
   const notifications = isRecord(raw.notifications) ? raw.notifications : {}
   const scanning = isRecord(raw.scanning) ? raw.scanning : {}
@@ -174,6 +175,7 @@ export function sanitizeSettings(raw: unknown): Settings {
       internetLost: bool(alerts.internetLost, base.alerts.internetLost),
       highLatency: bool(alerts.highLatency, base.alerts.highLatency),
       highTraffic: bool(alerts.highTraffic, base.alerts.highTraffic),
+      trafficAnomaly: bool(alerts.trafficAnomaly, base.alerts.trafficAnomaly),
       localIpChanged: bool(alerts.localIpChanged, base.alerts.localIpChanged),
       dnsFailure: bool(alerts.dnsFailure, base.alerts.dnsFailure),
       highLatencyMs: int(alerts.highLatencyMs, base.alerts.highLatencyMs, 10, 5000),
@@ -192,7 +194,8 @@ export function sanitizeSettings(raw: unknown): Settings {
     },
     privacy: {
       allowPublicIp: bool(privacy.allowPublicIp, base.privacy.allowPublicIp),
-      allowExternalPing: bool(privacy.allowExternalPing, base.privacy.allowExternalPing)
+      allowExternalPing: bool(privacy.allowExternalPing, base.privacy.allowExternalPing),
+      strictLocal: bool(privacy.strictLocal, base.privacy.strictLocal)
     },
     advanced: {
       activeProfileId: text(advanced.activeProfileId, base.advanced.activeProfileId, 64),
@@ -244,7 +247,8 @@ export class SettingsStore {
   }
 
   update(patch: unknown): Settings {
-    this.current = sanitizeSettings(deepMerge(this.current, patch))
+    // Les valeurs invalides conservent le réglage courant au lieu de revenir au défaut.
+    this.current = sanitizeSettings(deepMerge(this.current, patch), this.current)
     this.persist()
     this.emit()
     return this.get()

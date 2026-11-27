@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Étiquette de version à publier (ex. v1.0.1)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Construire et publier
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run doctor
+
+      - run: npm run typecheck
+
+      - run: npm test
+
+      - name: Installateur NSIS + version portable
+        run: npm run dist:win
+
+      - name: Créer la release GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: NetWatch ${{ github.event.inputs.tag || github.ref_name }}
+          draft: true
+          generate_release_notes: true
+          files: |
+            release/*.exe
+            release/*.blockmap
+          body: |
+            ## NetWatch ${{ github.event.inputs.tag || github.ref_name }}
+
+            Application Windows de surveillance réseau locale (aucun compte, aucune clé API, aucune donnée envoyée).
+
+            - `NetWatch-*-setup.exe` : installateur (choix du dossier, raccourcis, désinstallation propre).
+            - `NetWatch-*-portable.exe` : version portable, aucune installation.
+
+            Vérifiez la somme SHA-256 publiée avec les fichiers avant exécution.

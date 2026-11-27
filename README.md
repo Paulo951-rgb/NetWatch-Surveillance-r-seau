@@ -131,6 +131,11 @@ Le thème clair reprend la même hiérarchie visuelle avec des contrastes vérif
 | Pas d'exploitation de vulnérabilité | Le scanner se limite à la découverte d'hôtes (ICMP, ARP, connexion TCP sur quelques ports courants). Aucune tentative d'exploit, de brute force ou d'élévation de privilèges. |
 | Isolation de l'interface | `contextIsolation: true`, `nodeIntegration: false`, `sandbox` du renderer, preload exposant une API typée et fermée (`window.netwatch`). |
 | Politique de sécurité du contenu | CSP stricte dans `index.html`, aucune ressource distante chargée. |
+| Contrôle d'origine IPC | Chaque appel IPC vérifie la fenêtre émettrice, le cadre principal et l'URL (`file://` ou serveur de développement). Un appel venu d'une autre vue web est refusé et journalisé. |
+| Permissions refusées | Toutes les permissions de session (caméra, micro, géolocalisation, notifications web, presse-papiers) sont refusées ; toute requête réseau du renderer vers un hôte non local est bloquée. |
+| Validation des entrées | Les charges utiles IPC sont bornées et typées (longueurs, intervalles, énumérations) ; les cibles réseau passent par un validateur IPv4/CIDR/nom d'hôte avant tout appel système. |
+| Mode local strict | Option de confidentialité qui supprime toute requête sortante : pas d'IP publique, pas de ping Internet, tests distants marqués « désactivés ». |
+| Intégrité des données | Vérification `PRAGMA quick_check` au démarrage, mise en quarantaine d'une base corrompue (`.corrupt-<date>`), sauvegarde à chaud et restauration depuis les paramètres. |
 | Aucun logiciel espion | Pas de keylogger, pas de capture d'écran, pas de surveillance de la navigation. |
 
 NetWatch n'affirme jamais détecter une « attaque » : il signale des **anomalies** (nouvel appareil, variation de
@@ -198,11 +203,29 @@ sont des modules séparés, sans dépendance circulaire.
 
 ### 4.1 Utilisateur final (Windows)
 
-1. Télécharger `NetWatch-1.0.0-setup.exe` (installateur) ou `NetWatch-1.0.0-portable.exe` (aucune installation).
-2. Lancer le fichier. Aucun runtime externe n'est requis : Node.js et Electron sont embarqués.
-3. L'installateur crée un raccourci Bureau et un raccourci Menu Démarrer, et propose le choix du dossier.
-   La désinstallation se fait par « Applications et fonctionnalités » et supprime proprement les fichiers
-   du programme (les données personnelles peuvent être conservées ou supprimées).
+1. Télécharger `NetWatch-1.0.0-setup.exe` (installateur) ou `NetWatch-1.0.0-portable.exe` (aucune installation)
+   depuis la page **Releases** du dépôt.
+2. Lancer le fichier. Aucun runtime externe n'est requis : Node.js, Electron et le module SQLite natif sont
+   embarqués. Aucune compilation, aucun Python, aucun Visual Studio Build Tools.
+3. L'installateur propose le dossier d'installation, crée un raccourci Bureau et Menu Démarrer, et enregistre
+   la désinstallation dans « Applications et fonctionnalités ».
+
+Installation silencieuse (déploiement en parc) :
+
+```powershell
+NetWatch-1.0.0-setup.exe /S                      # installation silencieuse
+NetWatch-1.0.0-setup.exe /S /D=C:\Tools\NetWatch # dossier personnalisé
+```
+
+Désinstallation silencieuse :
+
+```powershell
+& "$env:LOCALAPPDATA\Programs\NetWatch\Uninstall NetWatch.exe" /S
+```
+
+Les données (base SQLite, journaux) vivent dans `%APPDATA%\NetWatch` et ne sont pas supprimées par
+désinstallation, afin de conserver l'historique en cas de réinstallation. Le bouton « Ouvrir le dossier
+de données » des paramètres y donne accès, et l'application propose sauvegarde et restauration de la base.
 
 > Windows peut afficher un avertissement SmartScreen : le binaire n'est pas signé numériquement (aucun
 > certificat de signature n'est fourni). Cliquer sur « Informations complémentaires » → « Exécuter quand même ».
@@ -219,13 +242,18 @@ chmod +x NetWatch-1.0.0-x86_64.AppImage
 Prérequis : Node.js ≥ 20 et npm.
 
 ```bash
-npm install          # dépendances
+npm ci               # installation reproductible (aucune compilation native)
+npm run doctor       # vérifie SQLite natif, base OUI, icônes et build
 npm run dev          # application en mode développement (rechargement à chaud)
 npm run build        # compilation du processus principal, du preload et de l'interface
 npm start            # exécution de la version compilée
 npm test             # suite de tests Vitest
 npm run typecheck    # vérification TypeScript (node + web)
 ```
+
+`better-sqlite3` est distribué en binaire **N-API** (prebuilds Windows x64/arm64, Linux, macOS) : il n'y a
+jamais de `node-gyp`, donc pas de Python ni de compilateur à installer. Si `npm run doctor` échoue, voir
+la section [Dépannage](#9-dépannage).
 
 Régénération des ressources :
 
@@ -260,6 +288,22 @@ Artefacts produits dans `release/` :
 Contenu embarqué : `app.asar` (code compilé), `app.asar.unpacked` (module SQLite), `oui.json` (base fabricants),
 icônes. L'utilisateur final n'a besoin ni de Node.js, ni d'une configuration particulière.
 
+**Compilation croisée depuis Linux** : l'installateur NSIS exige wine 64 **et** 32 bits (le désinstalleur est
+généré en exécutant le stub 32 bits) ainsi qu'un affichage virtuel. Détail et commandes exactes dans
+[docs/LANCEMENT.md](docs/LANCEMENT.md#compilation-croisée-depuis-linux). Sous Windows, aucune dépendance
+supplémentaire n'est nécessaire.
+
+Derniers artefacts vérifiés (build du 27/11/2026, Windows x64) :
+
+| Fichier | Taille | SHA-256 |
+| --- | --- | --- |
+| `NetWatch-1.0.0-setup.exe` | 129 209 789 octets | `b9c38ac1b549a41fff6821d26a9909f05a484075bd048bb5feeefdf28d3c2398` |
+| `NetWatch-1.0.0-portable.exe` | 117 224 755 octets | `0ba5574ab8b17aa5b616271fea5891ee3ef3499ff541f9eeb64333dc69f33c53` |
+
+Contrôle de l'installateur : il contient `$PLUGINSDIR/app-64.7z` (charge utile de l'application) et
+`$R0/Uninstall NetWatch.exe` (désinstalleur), ce qui garantit une désinstallation propre enregistrée dans
+« Applications et fonctionnalités ».
+
 **Signature** : aucun certificat n'est configuré ; pour signer, renseigner `win.certificateFile` et
 `win.certificatePassword` (ou les variables d'environnement `CSC_LINK` / `CSC_KEY_PASSWORD`) avant le build.
 
@@ -283,7 +327,7 @@ icônes. L'utilisateur final n'a besoin ni de Node.js, ni d'une configuration pa
 ## 7. Tests et qualité
 
 ```bash
-npm test          # 123 tests
+npm test          # 144 tests
 npm run typecheck # TypeScript strict, projets node et web
 ```
 
@@ -298,6 +342,9 @@ Couverture fonctionnelle :
 | Moteur d'alertes (règles, seuils, repos, notifications) | `tests/alerts.test.ts` |
 | Export CSV/JSON (échappement, en-têtes, formats) | `tests/export.test.ts` |
 | Paramètres, validation, profils, persistance | `tests/settings.test.ts` |
+| Sécurité Electron (origine IPC, cadres, fenêtre) | `tests/security.test.ts` |
+| Validation des charges utiles IPC (hôtes, bornes) | `tests/validation.test.ts` |
+| Intégrité, sauvegarde et récupération SQLite | `tests/database-integrity.test.ts` |
 | Intégration système réelle (ping, ARP, connexions, compteurs, diagnostic, trafic) | `tests/services.test.ts` |
 
 Les tests d'intégration exécutent les véritables adaptateurs système : ils mesurent des compteurs réels,
@@ -330,6 +377,54 @@ SQLite dans le dossier utilisateur.
 ---
 
 ## 9. Dépannage
+
+### `npm ci` n'installe pas Electron / erreur `Electron failed to install correctly`
+
+Depuis Electron 45, le binaire n'est plus téléchargé par un script `postinstall` : il est récupéré au premier
+`npm run dev` (ou `npm start`). Si le téléchargement échoue (proxy, pare-feu), relancez :
+
+```bash
+npx install-electron      # téléchargement explicite du binaire
+npm run dev
+```
+
+### Avertissement npm 12 « install scripts blocked »
+
+Le projet déclare une politique explicite dans `package.json` :
+
+```json
+"allowScripts": {
+  "electron-winstaller": true,
+  "better-sqlite3": false
+}
+```
+
+`better-sqlite3` est volontairement **refusé** : il est livré en binaire N-API (`prebuilds/`), donc `node-gyp`,
+Python et Visual Studio ne sont jamais nécessaires. Si votre npm est antérieur à cette fonctionnalité, le champ
+est simplement ignoré.
+
+### `npm run doctor` signale `better-sqlite3`
+
+```bash
+rm -rf node_modules package-lock.json && npm install   # ou : npm rebuild better-sqlite3
+npm run doctor
+```
+
+Vérifiez aussi que `node_modules/better-sqlite3/prebuilds/` contient bien `win32-x64.node` (ou la variante de
+votre plateforme) : un antivirus trop strict peut supprimer ce fichier.
+
+### La base de données est signalée comme corrompue
+
+Au démarrage, une base illisible est renommée `netwatch.db.corrupt-<horodatage>` et une base neuve est créée ;
+l'application démarre donc toujours. Pour récupérer l'historique, utilisez **Paramètres → Sauvegarder /
+Restaurer** avec une sauvegarde antérieure. Les fichiers `.corrupt-*` restent dans le dossier de données pour
+analyse.
+
+### La page « Connexions » est vide
+
+La liste des connexions provient de `netstat`/`ss`/`Get-NetTCPConnection`. Sous Windows, les connexions d'autres
+utilisateurs et les PID protégés peuvent être masqués ; sous Linux, `ss -p` nécessite des droits sur `/proc`.
+NetWatch n'élève jamais ses privilèges automatiquement.
 
 | Symptôme | Cause probable | Solution |
 | --- | --- | --- |

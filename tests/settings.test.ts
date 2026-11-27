@@ -26,8 +26,17 @@ describe('valeurs par défaut', () => {
     expect(settings.scanning.autoScan).toBe(true)
     expect(settings.monitoring.enabled).toBe(true)
     expect(settings.privacy.allowPublicIp).toBe(false)
+    expect(settings.privacy.strictLocal).toBe(false)
+    expect(settings.alerts.trafficAnomaly).toBe(true)
     expect(settings.alerts.cooldownMinutes).toBe(10)
     expect(Object.keys(settings.alerts).length).toBeGreaterThanOrEqual(12)
+  })
+
+  it('persiste le mode local strict et refuse les valeurs non booléennes', () => {
+    const store = new SettingsStore(repo)
+    expect(store.update({ privacy: { strictLocal: true } }).privacy.strictLocal).toBe(true)
+    expect(new SettingsStore(repo).get().privacy.strictLocal).toBe(true)
+    expect(store.update({ privacy: { strictLocal: 'oui' } }).privacy.strictLocal).toBe(true)
   })
 
   it('expose des profils intégrés', () => {

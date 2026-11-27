@@ -85,14 +85,18 @@ export class ConnectivityMonitor {
         gatewayOk = ping.received > 0
       }
 
+      const strictLocal = settings.privacy.strictLocal
       const reachable = this.deps.reachable ?? anyTcpReachable
-      const internet = await reachable(
-        [
-          { host: '1.1.1.1', port: 443 },
-          { host: '8.8.8.8', port: 53 }
-        ],
-        1500
-      )
+      // En mode strictement local, seul le réseau local est testé : aucune socket vers Internet.
+      const internet = strictLocal
+        ? gatewayOk
+        : await reachable(
+            [
+              { host: '1.1.1.1', port: 443 },
+              { host: '8.8.8.8', port: 53 }
+            ],
+            1500
+          )
 
       let dnsOk = false
       try {
@@ -104,7 +108,10 @@ export class ConnectivityMonitor {
 
       let internetMs: number | null = null
       let loss: number | null = null
-      if (settings.privacy.allowExternalPing && internet) {
+      if (strictLocal) {
+        internetMs = null
+        loss = null
+      } else if (settings.privacy.allowExternalPing && internet) {
         const ping = await adapter.ping('1.1.1.1', { count: 3, timeoutMs: 1000 })
         internetMs = ping.rttMs
         loss = ping.sent > 0 ? ping.lossPercent : null
