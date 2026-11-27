@@ -1,0 +1,8 @@
+Envoi d'une requete 'ping' sur 192.168.1.1 avec 32 octets de donnees :
+Reponse de 192.168.1.1 : octets=32 temps=1 ms TTL=64
+Reponse de 192.168.1.1 : octets=32 temps<1ms TTL=64
+Reponse de 192.168.1.1 : octets=32 temps=3 ms TTL=64
+Reponse de 192.168.1.1 : octets=32 temps=2 ms TTL=64
+
+Statistiques Ping pour 192.168.1.1:
+    Paquets : envoyes = 4, recus = 4, perdus = 0 (0% perte),
