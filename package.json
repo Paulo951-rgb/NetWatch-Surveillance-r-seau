@@ -20,9 +20,9 @@
     "test:watch": "vitest",
     "icons": "node scripts/generate-icons.mjs",
     "oui": "node scripts/build-oui.mjs",
-    "dist:win": "npm run build && electron-builder --win --x64",
-    "dist:portable": "npm run build && electron-builder --win portable --x64",
-    "dist:linux": "npm run build && electron-builder --linux --x64",
+    "dist:win": "npm run build && electron-builder --win --x64 --publish never",
+    "dist:portable": "npm run build && electron-builder --win portable --x64 --publish never",
+    "dist:linux": "npm run build && electron-builder --linux --x64 --publish never",
     "doctor": "node scripts/doctor.mjs"
   },
   "dependencies": {

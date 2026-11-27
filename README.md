@@ -276,6 +276,10 @@ npm run dist:linux      # AppImage (Linux x64)
 npx electron-builder --mac   # dmg (à exécuter sous macOS)
 ```
 
+Les scripts passent `--publish never` : un build local ne tente jamais de publier, même sur un commit
+étiqueté. La publication est assurée par `.github/workflows/release.yml` (push d'un tag `v*`), qui construit
+sous `windows-latest` puis crée une release **brouillon** avec les `.exe` et leurs `.blockmap`.
+
 Artefacts produits dans `release/` :
 
 | Fichier | Description |

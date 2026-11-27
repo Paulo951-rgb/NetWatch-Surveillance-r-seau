@@ -34,6 +34,9 @@ jobs:
 
       - run: npm test
 
+      # Les scripts dist:* passent « --publish never » : la publication est faite
+      # uniquement par l'étape suivante, pour éviter qu'electron-builder n'exige
+      # un GH_TOKEN et ne crée une release non maîtrisée dès qu'un tag est présent.
       - name: Installateur NSIS + version portable
         run: npm run dist:win
 
