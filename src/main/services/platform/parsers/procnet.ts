@@ -60,7 +60,7 @@ function splitAddress(value: string): { address: string; port: number } | null {
  */
 export function parseProcNet(content: string, protocol: 'TCP' | 'UDP'): ProcNetEntry[] {
   const entries: ProcNetEntry[] = []
-  const lines = content.split('\n').slice(1)
+  const lines = content.split(/\r?\n/).slice(1)
   for (const rawLine of lines) {
     const line = rawLine.trim()
     if (!line) continue

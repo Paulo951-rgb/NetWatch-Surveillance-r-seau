@@ -211,12 +211,23 @@ export function openDatabase(path: string, options: OpenDatabaseOptions = {}): S
 
   const connect = (): SqliteDatabase => {
     const db = new Database(path, { readonly: options.readonly ?? false })
-    db.pragma('journal_mode = WAL')
-    db.pragma('synchronous = NORMAL')
-    db.pragma('foreign_keys = ON')
-    db.pragma('busy_timeout = 5000')
-    if (!options.readonly) migrate(db)
-    return db
+    try {
+      db.pragma('journal_mode = WAL')
+      db.pragma('synchronous = NORMAL')
+      db.pragma('foreign_keys = ON')
+      db.pragma('busy_timeout = 5000')
+      if (!options.readonly) migrate(db)
+      return db
+    } catch (error) {
+      // Windows refuse de renommer un fichier encore ouvert : sans cette fermeture,
+      // une base corrompue ne pourrait jamais être mise de côté.
+      try {
+        db.close()
+      } catch {
+        // handle déjà invalidé par l'erreur SQLite
+      }
+      throw error
+    }
   }
 
   if (!isFile || options.readonly || options.recoverCorrupt === false) return connect()

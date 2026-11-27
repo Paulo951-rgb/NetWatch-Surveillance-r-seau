@@ -59,6 +59,11 @@ sur les URL `file://`).
 * Les hôtes qui filtrent l'ICMP ne sont détectés que par ARP ou par test de ports.
 * `guessScanRange` renvoie `null` pour un masque /31 ou /32 : le scan automatique est alors ignoré, et
   l'utilisateur doit saisir une plage.
+* Les analyseurs doivent découper les lignes avec `split(/\r?\n/)` : une sortie Windows (ou un checkout
+  `core.autocrlf=true`) se termine par `\r`, ce qui casse toute expression `(.+)$`. Les fixtures de
+  `tests/fixtures/` sont déclarées `-text` dans `.gitattributes` pour rester identiques octet pour octet.
+* Windows refuse `rename`/`unlink` sur un fichier encore ouvert : tout handle SQLite doit être fermé avant
+  de mettre une base corrompue de côté (voir `connect()` dans `src/main/data/database.ts`).
 
 ## Packaging Windows depuis Linux (vérifié)
 
