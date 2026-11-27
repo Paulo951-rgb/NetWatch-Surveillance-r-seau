@@ -193,6 +193,9 @@ sont des modules séparés, sans dépendance circulaire.
 
 ## 4. Installation
 
+> Guide détaillé pas à pas (installateur, portable, Linux, sources, reconstruction des `.exe`,
+> première utilisation) : **[docs/LANCEMENT.md](docs/LANCEMENT.md)**.
+
 ### 4.1 Utilisateur final (Windows)
 
 1. Télécharger `NetWatch-1.0.0-setup.exe` (installateur) ou `NetWatch-1.0.0-portable.exe` (aucune installation).
