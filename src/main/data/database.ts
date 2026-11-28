@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3'
 import { dirname } from 'node:path'
-import { mkdirSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, renameSync, rmSync, statSync } from 'node:fs'
 
 export type SqliteDatabase = Database.Database
 
@@ -150,20 +150,103 @@ export function migrate(db: SqliteDatabase): void {
   }
 }
 
+/** Sauvegarde à chaud, cohérente même avec le mode WAL actif. */
+export async function backupDatabase(db: SqliteDatabase, destination: string): Promise<number> {
+  await db.backup(destination)
+  return statSync(destination).size
+}
+
+/**
+ * Remplace la base courante par un fichier de sauvegarde vérifié.
+ * L'appelant doit avoir fermé la base ; un redémarrage est nécessaire ensuite.
+ */
+export function replaceDatabaseFile(source: string, target: string): void {
+  copyFileSync(source, target)
+  for (const suffix of ['-wal', '-shm']) rmSync(`${target}${suffix}`, { force: true })
+}
+
 export interface OpenDatabaseOptions {
   readonly?: boolean
   inMemory?: boolean
+  /** Déplace une base corrompue avant de la recréer (par défaut : oui). */
+  recoverCorrupt?: boolean
+}
+
+export interface IntegrityReport {
+  ok: boolean
+  messages: string[]
+  sizeBytes: number
+  pageCount: number
+}
+
+export function integrityCheck(db: SqliteDatabase): IntegrityReport {
+  const rows = db.pragma('quick_check') as { quick_check?: string }[]
+  const messages = rows
+    .map((row) => row.quick_check ?? Object.values(row)[0])
+    .filter((value): value is string => typeof value === 'string')
+  const pageCount = Number(db.pragma('page_count', { simple: true }) ?? 0)
+  const pageSize = Number(db.pragma('page_size', { simple: true }) ?? 0)
+  return {
+    ok: messages.length === 1 && messages[0].toLowerCase() === 'ok',
+    messages,
+    pageCount,
+    sizeBytes: pageCount * pageSize
+  }
+}
+
+function quarantine(file: string): string | null {
+  if (!existsSync(file)) return null
+  const target = `${file}.corrupt-${Date.now()}`
+  try {
+    renameSync(file, target)
+    return target
+  } catch {
+    return null
+  }
 }
 
 export function openDatabase(path: string, options: OpenDatabaseOptions = {}): SqliteDatabase {
-  if (!options.inMemory && path !== ':memory:') {
-    mkdirSync(dirname(path), { recursive: true })
+  const isFile = !options.inMemory && path !== ':memory:'
+  if (isFile) mkdirSync(dirname(path), { recursive: true })
+
+  const connect = (): SqliteDatabase => {
+    const db = new Database(path, { readonly: options.readonly ?? false })
+    try {
+      db.pragma('journal_mode = WAL')
+      db.pragma('synchronous = NORMAL')
+      db.pragma('foreign_keys = ON')
+      db.pragma('busy_timeout = 5000')
+      if (!options.readonly) migrate(db)
+      return db
+    } catch (error) {
+      // Windows refuse de renommer un fichier encore ouvert : sans cette fermeture,
+      // une base corrompue ne pourrait jamais être mise de côté.
+      try {
+        db.close()
+      } catch {
+        // handle déjà invalidé par l'erreur SQLite
+      }
+      throw error
+    }
   }
-  const db = new Database(path, { readonly: options.readonly ?? false })
-  db.pragma('journal_mode = WAL')
-  db.pragma('synchronous = NORMAL')
-  db.pragma('foreign_keys = ON')
-  db.pragma('busy_timeout = 5000')
-  if (!options.readonly) migrate(db)
-  return db
+
+  if (!isFile || options.readonly || options.recoverCorrupt === false) return connect()
+
+  try {
+    const db = connect()
+    const report = integrityCheck(db)
+    if (!report.ok) {
+      db.close()
+      throw new Error(`Base corrompue : ${report.messages.join('; ')}`)
+    }
+    return db
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    // Une base illisible ne doit pas empêcher l'application de démarrer : on la met de côté.
+    if (!/corrupt|malformed|not a database/i.test(message)) throw error
+    quarantine(path)
+    quarantine(`${path}-wal`)
+    quarantine(`${path}-shm`)
+    return connect()
+  }
 }

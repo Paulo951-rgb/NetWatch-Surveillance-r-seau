@@ -112,12 +112,33 @@ Résultat dans `release/` :
 ### Compilation croisée depuis Linux
 
 ```bash
-npm run dist:win    # nécessite wine pour l'icône et les métadonnées de l'exécutable
+npm run dist:win    # nécessite wine 64 bits ET 32 bits, plus un affichage virtuel
 npm run dist:linux  # AppImage
 ```
 
+Sous Linux, electron-builder génère l'installateur NSIS avec `makensis` **et** l'exécute ensuite sous wine
+pour produire le désinstalleur : ce stub est un binaire 32 bits. Il faut donc trois éléments :
+
+```bash
+sudo dpkg --add-architecture i386
+sudo apt-get update
+sudo apt-get install -y wine64 wine32:i386 xvfb   # Debian / Ubuntu
+
+xvfb-run -a npm run dist:win                      # wine a besoin d'un serveur X
+```
+
+Sans `wine32:i386`, le build s'arrête sur
+`wine: failed to load L"\\??\\C:\\windows\\syswow64\\ntdll.dll" error c0000135`.
+Sans `xvfb`, il s'arrête sur `wine process failed 1` avec `nodrv_CreateWindow`.
+Si un préfixe wine a été créé dans un état incomplet, le supprimer et le recréer :
+
+```bash
+rm -rf ~/.wine && xvfb-run -a wineboot -i
+```
+
 Une compilation native sous Windows reste préférable : elle évite toute dépendance à wine et
-produit exactement ce que verront les utilisateurs.
+produit exactement ce que verront les utilisateurs (c'est ce que fait le workflow
+`.github/workflows/release.yml` sur `windows-latest`).
 
 ---
 

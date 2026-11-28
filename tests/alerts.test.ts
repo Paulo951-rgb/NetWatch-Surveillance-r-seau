@@ -149,6 +149,52 @@ describe('moteur d’alertes', () => {
     expect(alerts.list({})[0].type).toBe('high-traffic')
   })
 
+  it('détecte une variation par rapport au comportement habituel, sans la présenter comme une attaque', () => {
+    const instance = engine()
+    const snapshot = (rxRate: number): TrafficSnapshot => ({
+      timestamp: clock,
+      rxRate,
+      txRate: 0,
+      rxTotal: 0,
+      txTotal: 0,
+      interfaces: [],
+      source: 'test'
+    })
+
+    // 30 échantillons calmes : ~200 kbit/s
+    for (let index = 0; index < 30; index++) instance.onTraffic(snapshot(25_000))
+    expect(alerts.list({})).toHaveLength(0)
+
+    // Pic à 40 Mbit/s : très au-dessus de la moyenne et de l'écart-type
+    instance.onTraffic(snapshot(5_000_000))
+    const raised = alerts.list({})
+    expect(raised).toHaveLength(1)
+    expect(raised[0].type).toBe('traffic-anomaly')
+    expect(raised[0].message).toContain('moyenne')
+    expect(raised[0].message).toContain('nécessairement')
+  })
+
+  it('ignore le bruit de fond et laisse la règle désactivable', () => {
+    const instance = engine()
+    const snapshot: TrafficSnapshot = {
+      timestamp: clock,
+      rxRate: 30_000,
+      txRate: 20_000,
+      rxTotal: 0,
+      txTotal: 0,
+      interfaces: [],
+      source: 'test'
+    }
+    for (let index = 0; index < 40; index++) instance.onTraffic(snapshot)
+    expect(alerts.list({})).toHaveLength(0)
+
+    settings.update({ alerts: { trafficAnomaly: false } })
+    const second = engine()
+    for (let index = 0; index < 30; index++) second.onTraffic(snapshot)
+    second.onTraffic({ ...snapshot, rxRate: 8_000_000 })
+    expect(alerts.list({})).toHaveLength(0)
+  })
+
   it('signale un changement d’adresse IP locale et de passerelle', () => {
     const instance = engine()
     const previous = {

@@ -190,6 +190,15 @@ describe('Linux : analyseurs', () => {
     expect(counters.find((c) => c.name === 'lo')?.rxBytes).toBe(1234567)
   })
 
+  it('tolère des fins de ligne CRLF (sortie Windows ou checkout autocrlf)', () => {
+    const crlf = fixture('linux/proc-net-dev.txt').replace(/\n/g, '\r\n')
+    const counters = parseProcNetDev(crlf)
+    expect(counters).toHaveLength(3)
+    expect(counters.find((c) => c.name === 'eth0')?.txBytes).toBe(1234567890)
+    const neigh = parseIpNeigh(fixture('linux/ip-neigh.txt').replace(/\n/g, '\r\n'))
+    expect(neigh).toHaveLength(3)
+  })
+
   it('lit ip neigh en ignorant les échecs', () => {
     const entries = parseIpNeigh(fixture('linux/ip-neigh.txt'))
     expect(entries).toHaveLength(3)

@@ -196,6 +196,7 @@ a {
 
 .sidebar {
   width: var(--sidebar-width);
+  transition: width var(--transition-fast), flex-basis var(--transition-fast);
   flex: 0 0 var(--sidebar-width);
   display: flex;
   flex-direction: column;
@@ -555,5 +556,92 @@ a {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+  }
+}
+
+
+/* ---------- Barre latérale repliable et adaptation aux petits écrans ---------- */
+.sidebar-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 6px 10px;
+  width: 100%;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.sidebar-toggle:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.sidebar-toggle .chevron {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.app.sidebar-collapsed {
+  --sidebar-width: 72px;
+}
+
+.app.sidebar-collapsed .sidebar {
+  padding: 18px 8px 12px;
+}
+
+.app.sidebar-collapsed .brand {
+  justify-content: center;
+  padding: 2px 0 12px;
+}
+
+.app.sidebar-collapsed .brand-text,
+.app.sidebar-collapsed .nav-section-label,
+.app.sidebar-collapsed .nav-item .truncate,
+.app.sidebar-collapsed .status-line span:not(.dot),
+.app.sidebar-collapsed .sidebar-footer .row,
+.app.sidebar-collapsed .sidebar-toggle-label {
+  display: none;
+}
+
+.app.sidebar-collapsed .nav-item {
+  justify-content: center;
+  padding: 9px 0;
+}
+
+.app.sidebar-collapsed .nav-item .nav-badge {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  margin: 0;
+}
+
+.app.sidebar-collapsed .sidebar-footer {
+  padding: 10px 0 0;
+  text-align: center;
+}
+
+.app.sidebar-collapsed .sidebar-toggle {
+  justify-content: center;
+}
+
+.app.sidebar-collapsed .status-line {
+  justify-content: center;
+}
+
+/* Sous 1120 px, la navigation se replie d'elle-même pour laisser respirer le contenu. */
+@media (max-width: 1120px) {
+  .app:not(.sidebar-collapsed) {
+    --sidebar-width: 210px;
+  }
+
+  .page {
+    padding-left: 18px;
+    padding-right: 18px;
   }
 }

@@ -20,9 +20,10 @@
     "test:watch": "vitest",
     "icons": "node scripts/generate-icons.mjs",
     "oui": "node scripts/build-oui.mjs",
-    "dist:win": "npm run build && electron-builder --win --x64",
-    "dist:portable": "npm run build && electron-builder --win portable --x64",
-    "dist:linux": "npm run build && electron-builder --linux --x64"
+    "dist:win": "npm run build && electron-builder --win --x64 --publish never",
+    "dist:portable": "npm run build && electron-builder --win portable --x64 --publish never",
+    "dist:linux": "npm run build && electron-builder --linux --x64 --publish never",
+    "doctor": "node scripts/doctor.mjs"
   },
   "dependencies": {
     "better-sqlite3": "13.2.0"
@@ -41,5 +42,9 @@
     "typescript": "^5.9.3",
     "vite": "^8.4.0",
     "vitest": "^5.1.2"
+  },
+  "allowScripts": {
+    "electron-winstaller": true,
+    "better-sqlite3": false
   }
 }

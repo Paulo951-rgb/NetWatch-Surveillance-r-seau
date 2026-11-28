@@ -1,8 +1,9 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { statSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import type {
   DashboardSnapshot,
+  EventCategory,
   DeviceDetail,
   DevicePatch,
   ExportResult,
@@ -15,7 +16,16 @@ import type {
 } from '@shared/types'
 import { IPC, type AlertListQuery, type DataStats, type DeviceListQuery } from '@shared/ipc'
 import { periodConfig } from './data/repositories/traffic'
+import { checkSender } from './security'
+import { asEnum, asHost, asInt, asString } from './validation'
 import type { AppContext } from './context'
+import {
+  SCHEMA_VERSION,
+  backupDatabase,
+  integrityCheck,
+  openDatabase,
+  replaceDatabaseFile
+} from './data/database'
 
 function requireNumber(value: unknown, fallback = 0): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback
@@ -66,8 +76,22 @@ function buildDashboard(ctx: AppContext): DashboardSnapshot {
 }
 
 export function registerIpcHandlers(ctx: AppContext, getWindow: () => BrowserWindow | null): void {
+  const devServerUrl = process.env['ELECTRON_RENDERER_URL']
   const handle = <T>(channel: string, fn: (payload: unknown) => Promise<T> | T): void => {
-    ipcMain.handle(channel, async (_event, payload: unknown) => {
+    ipcMain.handle(channel, async (event, payload: unknown) => {
+      const frame = event.senderFrame
+      const verdict = checkSender(
+        {
+          url: frame?.url ?? '',
+          isMainFrame: frame !== null && frame === event.sender.mainFrame,
+          webContentsId: event.sender.id
+        },
+        { expectedWebContentsId: getWindow()?.webContents.id ?? null, devServerUrl }
+      )
+      if (!verdict.ok) {
+        ctx.logger.warn(`IPC ${channel} refusé : ${verdict.reason}`)
+        throw new Error('Requête refusée')
+      }
       try {
         return await fn(payload)
       } catch (error) {
@@ -101,6 +125,66 @@ export function registerIpcHandlers(ctx: AppContext, getWindow: () => BrowserWin
   })
   handle(IPC.appOpenData, async () => {
     await shell.openPath(ctx.paths.dataDir)
+  })
+
+  handle(IPC.appIntegrity, () => ({
+    ...integrityCheck(ctx.db),
+    path: ctx.paths.databasePath,
+    schemaVersion: SCHEMA_VERSION
+  }))
+
+  handle(IPC.appBackup, async () => {
+    const window = getWindow()
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
+    const options = {
+      title: 'Sauvegarder la base NetWatch',
+      defaultPath: join(app.getPath('documents'), `netwatch-${stamp}.db`),
+      filters: [{ name: 'Base NetWatch', extensions: ['db'] }]
+    }
+    const result = window
+      ? await dialog.showSaveDialog(window, options)
+      : await dialog.showSaveDialog(options)
+    if (result.canceled || !result.filePath) {
+      return { canceled: true, filePath: null, bytes: 0 }
+    }
+    const bytes = await backupDatabase(ctx.db, result.filePath)
+    ctx.logger.info('Sauvegarde de la base créée', { filePath: result.filePath, bytes })
+    return { canceled: false, filePath: result.filePath, bytes }
+  })
+
+  handle(IPC.appRestore, async () => {
+    const window = getWindow()
+    const options = {
+      title: 'Restaurer une sauvegarde NetWatch',
+      properties: ['openFile' as const],
+      filters: [{ name: 'Base NetWatch', extensions: ['db', 'sqlite', 'sqlite3'] }]
+    }
+    const result = window
+      ? await dialog.showOpenDialog(window, options)
+      : await dialog.showOpenDialog(options)
+    if (result.canceled || result.filePaths.length === 0) {
+      return { canceled: true, restored: false, message: '' }
+    }
+    const source = result.filePaths[0]
+    const probe = openDatabase(source, { readonly: true, recoverCorrupt: false })
+    let report
+    try {
+      report = integrityCheck(probe)
+    } finally {
+      probe.close()
+    }
+    if (!report.ok) {
+      throw new Error(`Sauvegarde invalide : ${report.messages.join('; ')}`)
+    }
+
+    ctx.logger.info('Restauration de la base demandée', { source: basename(source) })
+    ctx.close()
+    replaceDatabaseFile(source, ctx.paths.databasePath)
+    setImmediate(() => {
+      app.relaunch()
+      app.exit(0)
+    })
+    return { canceled: false, restored: true, message: 'Restauration effectuée, redémarrage…' }
   })
 
   handle(IPC.windowMinimize, () => {
@@ -162,7 +246,17 @@ export function registerIpcHandlers(ctx: AppContext, getWindow: () => BrowserWin
   })
 
   handle(IPC.scanStart, async (payload) => {
-    const options = (payload ?? {}) as ScanOptions
+    const raw = (payload ?? {}) as ScanOptions
+    const range = raw.range === undefined || raw.range === 'auto' ? undefined : asHost(raw.range)
+    if (raw.range && raw.range !== 'auto' && !range) {
+      throw new Error('Plage invalide : utilisez une adresse privée au format 192.168.1.0/24')
+    }
+    const options: ScanOptions = {
+      range,
+      trigger: asEnum(raw.trigger, ['manual', 'auto', 'startup'] as const, 'manual'),
+      resolveHostnames: raw.resolveHostnames !== false,
+      probePorts: raw.probePorts !== false
+    }
     const settings = ctx.settings.get()
     try {
       const summary = await ctx.scanner.scan(options)
@@ -275,9 +369,19 @@ export function registerIpcHandlers(ctx: AppContext, getWindow: () => BrowserWin
   handle(IPC.connections, () => ctx.connections.snapshot())
 
   handle(IPC.history, (payload): HistoryPage => {
-    const query = (payload ?? {}) as HistoryQuery
+    const raw = (payload ?? {}) as HistoryQuery
+    const query: HistoryQuery = {
+      ...raw,
+      from: raw.from === undefined ? undefined : asInt(raw.from, 0, Number.MAX_SAFE_INTEGER, 0),
+      to: raw.to === undefined ? undefined : asInt(raw.to, 0, Number.MAX_SAFE_INTEGER, Date.now()),
+      limit: asInt(raw.limit, 1, 2000, 200),
+      categories: Array.isArray(raw.categories)
+        ? raw.categories.filter((c): c is EventCategory => typeof c === 'string').slice(0, 12)
+        : undefined,
+      search: asString(raw.search, 120) || undefined
+    }
     return {
-      events: ctx.events.list({ ...query, limit: query.limit ?? 200 }),
+      events: ctx.events.list(query),
       total: ctx.events.count(query)
     }
   })
@@ -286,14 +390,18 @@ export function registerIpcHandlers(ctx: AppContext, getWindow: () => BrowserWin
   handle(IPC.diagnosticsRunOne, (payload) => ctx.diagnostics.runOne(typeof payload === 'string' ? payload : ''))
   handle(IPC.diagnosticsLast, () => ctx.diagnostics.getLastReport())
   handle(IPC.diagnosticsTraceroute, (payload) =>
-    ctx.diagnostics.traceroute(typeof payload === 'string' && payload ? payload : undefined)
+    ctx.diagnostics.traceroute(asHost(payload))
   )
 
   handle(IPC.exportData, async (payload): Promise<ExportResult> => {
     const request = (payload ?? {}) as { dataset?: string; format?: 'csv' | 'json'; from?: number; to?: number; suggestedName?: string }
     const settings: Settings = ctx.settings.get()
-    const dataset = (request.dataset ?? 'devices') as never
-    const format = request.format ?? settings.export.defaultFormat
+    const dataset = asEnum(
+      request.dataset,
+      ['devices', 'alerts', 'events', 'traffic', 'latency', 'scans', 'diagnostics'] as const,
+      'devices'
+    ) as never
+    const format = asEnum(request.format, ['csv', 'json'] as const, settings.export.defaultFormat)
     const built = await ctx.exporter.build({
       dataset,
       format,

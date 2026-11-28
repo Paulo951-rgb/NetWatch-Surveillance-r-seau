@@ -26,9 +26,14 @@ export interface AlertEngineDeps {
 
 const SEVERITY_ORDER: Record<AlertSeverity, number> = { info: 1, warning: 2, critical: 3 }
 
+/** Nombre d'échantillons conservés pour établir le comportement habituel (≈ 4 min à 2 s). */
+const BASELINE_WINDOW = 120
+const BASELINE_MIN_SAMPLES = 30
+
 export class AlertEngine {
   private readonly lastRaised = new Map<string, number>()
   private readonly now: () => number
+  private readonly trafficBaseline: number[] = []
 
   constructor(private readonly deps: AlertEngineDeps) {
     this.now = deps.now ?? Date.now
@@ -197,18 +202,60 @@ export class AlertEngine {
 
   onTraffic(snapshot: TrafficSnapshot): void {
     const settings = this.deps.getSettings()
-    if (!settings.alerts.highTraffic) return
-    const mbps = ((snapshot.rxRate + snapshot.txRate) * 8) / 1_000_000
-    if (mbps < settings.alerts.highTrafficMbps) return
-    this.raise({
-      type: 'high-traffic',
-      severity: 'info',
-      title: 'Débit inhabituellement élevé',
-      message: `Trafic total de ${formatRate(snapshot.rxRate + snapshot.txRate)} (seuil : ${
-        settings.alerts.highTrafficMbps
-      } Mbit/s).`,
-      rule: 'high-traffic'
-    })
+    const totalRate = snapshot.rxRate + snapshot.txRate
+    const mbps = (totalRate * 8) / 1_000_000
+
+    if (settings.alerts.highTraffic && mbps >= settings.alerts.highTrafficMbps) {
+      this.raise({
+        type: 'high-traffic',
+        severity: 'info',
+        title: 'Débit inhabituellement élevé',
+        message: `Trafic total de ${formatRate(totalRate)} (seuil : ${
+          settings.alerts.highTrafficMbps
+        } Mbit/s).`,
+        rule: 'high-traffic'
+      })
+    }
+
+    const anomaly = this.detectTrafficAnomaly(totalRate)
+    if (settings.alerts.trafficAnomaly && anomaly) {
+      this.raise({
+        type: 'traffic-anomaly',
+        severity: 'warning',
+        title: 'Variation de trafic inhabituelle',
+        message: anomaly,
+        rule: 'traffic-anomaly'
+      })
+    }
+  }
+
+  /**
+   * Compare le débit courant au comportement des dernières minutes.
+   * Une variation mesurée n'est pas une preuve d'attaque : le message le rappelle.
+   */
+  private detectTrafficAnomaly(totalRate: number): string | null {
+    const window = this.trafficBaseline
+    const samples = window.length
+    window.push(totalRate)
+    if (window.length > BASELINE_WINDOW) window.shift()
+    if (samples < BASELINE_MIN_SAMPLES) return null
+
+    const mean = window.reduce((sum, value) => sum + value, 0) / window.length
+    if (mean <= 0) return null
+    const variance =
+      window.reduce((sum, value) => sum + (value - mean) ** 2, 0) / window.length
+    const deviation = Math.sqrt(variance)
+
+    const significant = totalRate > mean + Math.max(3 * deviation, mean * 2)
+    const aboveFloor = totalRate > 500_000 // 4 Mbit/s : évite le bruit de fond
+    if (!significant || !aboveFloor) return null
+
+    const ratio = (totalRate / mean).toFixed(1).replace('.', ',')
+    return (
+      `Débit de ${formatRate(totalRate)} contre ${formatRate(mean)} en moyenne sur les ` +
+      `dernières minutes (×${ratio}). Un pic peut venir d’une mise à jour, d’une sauvegarde ` +
+      `ou d’un téléchargement : ce n’est pas nécessairement une activité malveillante.`
+    )
   }
 
   onNetworkInfoChange(previous: NetworkInfo | null, current: NetworkInfo): void {

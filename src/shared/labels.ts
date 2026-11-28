@@ -30,6 +30,7 @@ export const ALERT_TYPE_LABELS: Record<AlertType, string> = {
   'internet-restored': 'Connexion rétablie',
   'high-latency': 'Latence élevée',
   'high-traffic': 'Débit élevé',
+  'traffic-anomaly': 'Variation de trafic inhabituelle',
   'local-ip-changed': 'Adresse IP modifiée',
   'gateway-changed': 'Passerelle modifiée',
   'dns-failure': 'Échec DNS',

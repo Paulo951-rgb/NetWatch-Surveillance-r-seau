@@ -267,6 +267,16 @@ export class DiagnosticsService {
 
   async testInternet(): Promise<DiagnosticResult> {
     return this.runSafely('internet', 'Connexion Internet', async () => {
+      if (this.deps.getSettings().privacy.strictLocal) {
+        return {
+          status: 'skipped',
+          summary: 'Désactivé (mode local strict)',
+          detail: 'Aucun test sortant n’est effectué : seuls la passerelle et le DNS sont vérifiés.',
+          explanation:
+            'Désactivez « Mode local strict » dans les paramètres de confidentialité pour autoriser ce test.',
+          metrics: [metric('Mode local strict', 'actif')]
+        }
+      }
       const reachable = this.deps.reachable ?? anyTcpReachable
       const tcpOk = await reachable(
         [

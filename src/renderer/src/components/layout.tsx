@@ -108,9 +108,18 @@ interface SidebarProps {
   onNavigate: (route: Route) => void
   unreadAlerts: number
   online: boolean
+  collapsed: boolean
+  onToggleCollapsed: () => void
 }
 
-export function Sidebar({ route, onNavigate, unreadAlerts, online }: SidebarProps): ReactNode {
+export function Sidebar({
+  route,
+  onNavigate,
+  unreadAlerts,
+  online,
+  collapsed,
+  onToggleCollapsed
+}: SidebarProps): ReactNode {
   const { t } = useI18n()
   const { settings } = useSettings()
   const [version, setVersion] = useState('')
@@ -172,6 +181,16 @@ export function Sidebar({ route, onNavigate, unreadAlerts, online }: SidebarProp
             <span>{settings.theme === 'dark' ? 'Sombre' : 'Clair'}</span>
           </div>
         ) : null}
+        <button
+          className="sidebar-toggle"
+          onClick={onToggleCollapsed}
+          title={collapsed ? 'Déplier la navigation' : 'Replier la navigation'}
+          aria-label={collapsed ? 'Déplier la navigation' : 'Replier la navigation'}
+          aria-expanded={!collapsed}
+        >
+          <span className="chevron">{collapsed ? '»' : '«'}</span>
+          <span className="sidebar-toggle-label">Replier</span>
+        </button>
       </div>
     </aside>
   )

@@ -1,6 +1,8 @@
 import type {
   Alert,
   AppInfo,
+  BackupResult,
+  DatabaseIntegrity,
   ConnectionSnapshot,
   DashboardSnapshot,
   Device,
@@ -16,6 +18,7 @@ import type {
   MonitoringProfile,
   NetworkInfo,
   NetworkInterfaceInfo,
+  RestoreResult,
   ScanComparison,
   ScanOptions,
   ScanProgress,
@@ -31,6 +34,9 @@ export const IPC = {
   appInfo: 'app:info',
   appOpenLogs: 'app:open-logs',
   appOpenData: 'app:open-data',
+  appIntegrity: 'app:integrity',
+  appBackup: 'app:backup',
+  appRestore: 'app:restore',
   windowMinimize: 'window:minimize',
   windowToggleMaximize: 'window:toggle-maximize',
   windowClose: 'window:close',
@@ -122,6 +128,9 @@ export interface NetWatchApi {
   getAppInfo(): Promise<AppInfo>
   openLogs(): Promise<void>
   openDataFolder(): Promise<void>
+  checkDatabase(): Promise<DatabaseIntegrity>
+  backupDatabase(): Promise<BackupResult>
+  restoreDatabase(): Promise<RestoreResult>
   minimizeWindow(): Promise<void>
   toggleMaximizeWindow(): Promise<boolean>
   closeWindow(): Promise<void>

@@ -4,7 +4,7 @@ import type { ArpEntry, InterfaceCounters, RawConnection } from '../types'
 /** `/proc/net/dev` (Linux). */
 export function parseProcNetDev(output: string): InterfaceCounters[] {
   const counters: InterfaceCounters[] = []
-  for (const rawLine of output.split('\n')) {
+  for (const rawLine of output.split(/\r?\n/)) {
     const match = /^\s*([^:]+):\s*(.+)$/.exec(rawLine)
     if (!match) continue
     const name = match[1].trim()
@@ -21,7 +21,7 @@ export function parseProcNetDev(output: string): InterfaceCounters[] {
 /** `ip neigh` (Linux). */
 export function parseIpNeigh(output: string): ArpEntry[] {
   const entries: ArpEntry[] = []
-  for (const rawLine of output.split('\n')) {
+  for (const rawLine of output.split(/\r?\n/)) {
     const match = /^(\d{1,3}(?:\.\d{1,3}){3})\s+dev\s+(\S+)\s+lladdr\s+(\S+)\s+(\S+)/.exec(
       rawLine.trim()
     )
@@ -36,7 +36,7 @@ export function parseIpNeigh(output: string): ArpEntry[] {
 /** `arp -an` (macOS / BSD). */
 export function parseArpBsd(output: string): ArpEntry[] {
   const entries: ArpEntry[] = []
-  for (const rawLine of output.split('\n')) {
+  for (const rawLine of output.split(/\r?\n/)) {
     const match = /^\S+\s+\((\d{1,3}(?:\.\d{1,3}){3})\)\s+at\s+([0-9a-fA-F:]+)/.exec(rawLine.trim())
     if (!match) continue
     const mac = normalizeMac(match[2])
@@ -52,7 +52,7 @@ export function parseArpBsd(output: string): ArpEntry[] {
  */
 export function parseSsOutput(output: string): (RawConnection & { processName: string | null })[] {
   const connections: (RawConnection & { processName: string | null })[] = []
-  for (const rawLine of output.split('\n')) {
+  for (const rawLine of output.split(/\r?\n/)) {
     const line = rawLine.trim()
     if (!line) continue
     const tokens = line.split(/\s+/)
@@ -114,7 +114,7 @@ export function parseIpRouteDefault(output: string): { gateway: string | null; i
 /** `/etc/resolv.conf` */
 export function parseResolvConf(content: string): string[] {
   const servers: string[] = []
-  for (const rawLine of content.split('\n')) {
+  for (const rawLine of content.split(/\r?\n/)) {
     const match = /^\s*nameserver\s+(\S+)/i.exec(rawLine)
     if (match && isValidIPv4(match[1])) servers.push(match[1])
   }
@@ -127,7 +127,7 @@ export function parseResolvConf(content: string): string[] {
  */
 export function parseNetstatIBN(output: string): InterfaceCounters[] {
   const byName = new Map<string, InterfaceCounters>()
-  for (const rawLine of output.split('\n')) {
+  for (const rawLine of output.split(/\r?\n/)) {
     const tokens = rawLine.trim().split(/\s+/)
     if (tokens.length < 10) continue
     const name = tokens[0]
@@ -150,7 +150,7 @@ export function parseNetstatIBN(output: string): InterfaceCounters[] {
 export function parseNetstatBsd(output: string): RawConnection[] {
   const connections: RawConnection[] = []
   const states = /^(ESTABLISHED|LISTEN|SYN_SENT|SYN_RCVD|FIN_WAIT_1|FIN_WAIT_2|CLOSE_WAIT|CLOSING|LAST_ACK|TIME_WAIT|CLOSED|CLOSE|IDLE)$/
-  for (const rawLine of output.split('\n')) {
+  for (const rawLine of output.split(/\r?\n/)) {
     const tokens = rawLine.trim().split(/\s+/)
     if (tokens.length < 6) continue
     const proto = tokens[0].toLowerCase()

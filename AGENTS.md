@@ -40,11 +40,18 @@ npm run dist:linux     # AppImage
 ## Vérification visuelle (sans écran)
 
 ```bash
+npm run build
 NETWATCH_CAPTURE=/tmp/ui.png NETWATCH_CAPTURE_ROUTES="/dashboard,/traffic" \
-NETWATCH_CAPTURE_DELAY=7000 npx electron --no-sandbox --ozone-platform=headless out/main/index.js
+NETWATCH_CAPTURE_DELAY=7000 xvfb-run -a npx electron . --no-sandbox
 ```
 
+Options utiles : `NETWATCH_CAPTURE_WIDTH`/`_HEIGHT` (taille de la fenêtre), `NETWATCH_CAPTURE_SCROLL`
+(défilement en pixels du conteneur `.content` avant la capture).
+
 `NETWATCH_CAPTURE*` est un crochet de développement : l'application capture les pages puis quitte.
+Pour vérifier un binaire empaqueté, remplacer la dernière commande par
+`xvfb-run -a ./release/linux-unpacked/netwatch --no-sandbox` (valide aussi la validation d'origine IPC
+sur les URL `file://`).
 
 ## Pièges connus
 
@@ -52,3 +59,27 @@ NETWATCH_CAPTURE_DELAY=7000 npx electron --no-sandbox --ozone-platform=headless 
 * Les hôtes qui filtrent l'ICMP ne sont détectés que par ARP ou par test de ports.
 * `guessScanRange` renvoie `null` pour un masque /31 ou /32 : le scan automatique est alors ignoré, et
   l'utilisateur doit saisir une plage.
+* Les analyseurs doivent découper les lignes avec `split(/\r?\n/)` : une sortie Windows (ou un checkout
+  `core.autocrlf=true`) se termine par `\r`, ce qui casse toute expression `(.+)$`. Les fixtures de
+  `tests/fixtures/` sont déclarées `-text` dans `.gitattributes` pour rester identiques octet pour octet.
+* Windows refuse `rename`/`unlink` sur un fichier encore ouvert : tout handle SQLite doit être fermé avant
+  de mettre une base corrompue de côté (voir `connect()` dans `src/main/data/database.ts`).
+
+## Packaging Windows depuis Linux (vérifié)
+
+`npm run dist:win` sous Linux exige **wine64 + wine32:i386 + Xvfb** :
+
+```bash
+sudo dpkg --add-architecture i386 && sudo apt-get update
+sudo apt-get install -y wine64 wine32:i386 xvfb
+xvfb-run -a npm run dist:win
+```
+
+Raisons (diagnostics rencontrés, dans l'ordre) : `spawn wine ENOENT` (wine absent) →
+`nodrv_CreateWindow` (pas de serveur X) → `failed to load C:\windows\syswow64\ntdll.dll c0000135`
+(stub 32 bits du désinstalleur NSIS sans support WoW64). Un préfixe créé sans affichage reste cassé :
+`rm -rf ~/.wine && xvfb-run -a wineboot -i`.
+
+Contrôle de l'installateur produit : `7za l release/NetWatch-*-setup.exe` doit lister
+`$PLUGINSDIR/app-64.7z` et `$R0/Uninstall NetWatch.exe`.
+

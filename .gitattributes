@@ -1,0 +1,13 @@
+# Normalise les fins de ligne : le code source reste en LF sur toutes les plateformes.
+* text=auto eol=lf
+
+# Les fixtures sont des sorties d'outils capturées : leurs octets doivent rester identiques
+# (un checkout Windows en CRLF a déjà cassé l'analyseur /proc/net/dev).
+tests/fixtures/** -text
+
+# Binaires
+*.png binary
+*.ico binary
+*.icns binary
+*.exe binary
+*.AppImage binary

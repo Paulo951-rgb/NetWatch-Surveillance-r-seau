@@ -96,7 +96,7 @@ export class NetworkInfoService {
       ssid = null
     }
 
-    const publicIpEnabled = settings.privacy.allowPublicIp
+    const publicIpEnabled = settings.privacy.allowPublicIp && !settings.privacy.strictLocal
     const publicIpValue = publicIpEnabled ? await this.getPublicIp() : null
 
     const info: NetworkInfo = {
@@ -120,7 +120,7 @@ export class NetworkInfoService {
 
   async getPublicIp(force = false): Promise<string | null> {
     const settings = this.deps.getSettings()
-    if (!settings.privacy.allowPublicIp) return null
+    if (!settings.privacy.allowPublicIp || settings.privacy.strictLocal) return null
     if (!force && this.now() - this.publicIp.at < PUBLIC_IP_TTL) return this.publicIp.value
     const provider = this.deps.publicIpProvider ?? defaultPublicIpProvider
     try {

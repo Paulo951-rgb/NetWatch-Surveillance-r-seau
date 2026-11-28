@@ -36,6 +36,7 @@ function Shell(): ReactNode {
   const { t } = useI18n()
   const toast = useToast()
   const [route, setRoute] = useState<Route>('dashboard')
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('netwatch.sidebar') === 'collapsed')
   const [status, setStatus] = useState<ConnectivityStatus | null>(null)
   const [unreadAlerts, setUnreadAlerts] = useState(0)
 
@@ -69,13 +70,25 @@ function Shell(): ReactNode {
   }, [route])
 
   const navigate = (next: Route): void => setRoute(next)
+  const toggleSidebar = (): void =>
+    setCollapsed((current) => {
+      localStorage.setItem('netwatch.sidebar', current ? 'expanded' : 'collapsed')
+      return !current
+    })
   const online = status?.internet ?? false
 
   return (
-    <div className="app">
+    <div className={`app${collapsed ? ' sidebar-collapsed' : ''}`}>
       <TitleBar />
       <div className="app-body">
-        <Sidebar route={route} onNavigate={navigate} unreadAlerts={unreadAlerts} online={online} />
+        <Sidebar
+          route={route}
+          onNavigate={navigate}
+          unreadAlerts={unreadAlerts}
+          online={online}
+          collapsed={collapsed}
+          onToggleCollapsed={toggleSidebar}
+        />
         <div className="main-area">
           <TopBar route={route} online={online} unreadAlerts={unreadAlerts} onNavigate={navigate} />
           <main className="content">
